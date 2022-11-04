@@ -29,7 +29,7 @@ start = time.time()
 # ################################################################################
 # Parameter
 # ################################################################################
-prefix = 'ps5011'
+prefix = 'ps9152'
 workname = 'fashion minist 심층 신경망'
 print(prefix + '_' + workname)
 
@@ -215,12 +215,12 @@ for epoch in range(num_epochs):
                 # 모델이 데이터를 처리하기 위해서는 동일한 device에 있어야 함
 
                 labels_list.append(labels)
-                test = Variable(images.view(100, 1, 28, 28)) 
+                test = Variable(images.view(100, 1, 28, 28))
                 # autograd는 자동미분을 수행하는 파이토치 핵심 패키지로 자동 미분에 대한 값을 저장하기 위해서 tape를 사용
                 # 순전파 단계에서 테이브는 수행하는 모든 연산을 저장함(그런데 이게 설명이 맞나)
                 # autograd는 Variable을 사용해서 역전파를 위한 미분값을 자동으로 계산해줌
                 # 자동미분을 게산하기 위해서는 torch.augograd 패키지 안에 있는 variable를 이용해야 동작함
-                
+
                 outputs = model(test) # torch.tensor, torch.Size([100,10])
                 '''
                 tensor([[-4.3525e+00, -4.9298e+00, -2.8806e+00, -3.9115e+00, -2.1844e+00,
