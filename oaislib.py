@@ -18,13 +18,6 @@
 ## oaislib.fn_get_timetail() #파일명 생성을 위한 테일링 YYMMDD_HHMMSS 생성
 
 ## ## DB
-## oaislib.fn_connect_dev_db() #개발부DB 연결
-## oaislib.fn_connect_lab_db() #연구소DB 연결
-## oaislib.fn_get_df_from_mstuv_dev_db(sql_str) #개발서버에서 sql결과를 df로 리턴
-## oaislib.fn_get_df_from_lab_db(sql_str) #연구소 서버에서 sql결과를 df로 리턴
-## oaislib.fn_get_df_from_test_mtrace_db(sql_str): test_mtrace db에서 쿼리 실행
-## oaislib.fn_run_sql_to_mstuv_dev_db(sql_str) #mlab 개발DB에 sql문 실행
-## oaislib.fn_run_sql_to_lab_db(sql_str) # mlab lab DB에 sql문 실행
 
 ## 날짜
 ### date_obj = oaislib.date_obj_gen_by_yyyymmdd(str) : 8자리 숫자를 날짜 객체로 리턴
@@ -234,6 +227,7 @@ def fn_get_timetail():
     timetail = yy + mm + dd + '_'+ hh + mm + ss
     return timetail
 
+'''
 ## connect_db
 def fn_connect_dev_db():
     db = pymysql.connect(host='bizdb.smartmlab.com',
@@ -343,9 +337,12 @@ def fn_run_sql_to_lab_db(sql_str):
     finally:
         db.close()
 
+'''
 
+################################################################################
 ## YYYY-MM-DD의 날짜 문자열 리턴
-def fn_get_date_str():
+################################################################################
+def get_date_str():
     now_time = datetime.now()
     date_str = str(now_time.year) + "-" + str(now_time.month) + "-" + str(now_time.day)
     return date_str

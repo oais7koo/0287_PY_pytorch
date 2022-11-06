@@ -19,6 +19,7 @@ class TorchvisionMaskDataset(Dataset):
 
         return img, target
 
+
 torchvision_transform = transforms.Compose([
     transforms.Resize((300, 300)),
     transforms.RandomCrop(224),

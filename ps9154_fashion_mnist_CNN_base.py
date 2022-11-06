@@ -24,7 +24,6 @@ print(prefix + '_' + workname)
 # ################################################################################
 # 코드 5-1 라이브러리 호출
 # ################################################################################
-
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -173,9 +172,17 @@ labels_list = []
 for epoch in range(num_epochs):
     for images, labels in train_loader:
         images, labels = images.to(device), labels.to(device)
+        # image : torch.Size([100, 1, 28, 28])
+        # labels : torch.Size([100])
 
-        train = Variable(images.view(100,1,28,28))
-        labels = Variable(labels)
+        # train = Variable(images.view(100,1,28,28))
+        # train의 형태와 images의 형태가 같아서 view를 지정하지 않아도 됨
+
+        #train = Variable(images)
+        #labels = Variable(labels)
+
+        train = images
+        labels = labels
 
         outputs = model(train)
         loss = criterion(outputs, labels)

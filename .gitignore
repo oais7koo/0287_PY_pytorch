@@ -131,3 +131,9 @@ wall_img
 ref
 
 *.pdf
+/psx02*/minicity/*
+/psx*/data/*
+/psx*/psdata/*
+psx04_unet_sseg_cell/data
+psx04_unet_sseg_cell/readme_images
+psx04_unet_sseg_cell/src
