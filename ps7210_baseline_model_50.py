@@ -41,7 +41,7 @@ if not os.path.exists(output_dir):
 # ################################################################################
 learning_rate=1e-5
 width=height=512 # image width and height
-batch_size=5
+batch_size=10
 
 in_channels = 256
 out_channels = 2
@@ -123,8 +123,6 @@ optimizer = torch.optim.Adam(params=Net.parameters(), lr=learning_rate)
 # Train
 # ################################################################################
 # 모델 정확도 저장할 df 작성
-model_df = pd.DataFrame(columns=['itr','loss_val','acc','precision','recall',
-                                 'TPr','TNr','FPr','FNr'])
 
 for itr in range(100000):
     imgs, anns = load_batch(batch_size, imgset, maskset)
@@ -144,13 +142,15 @@ for itr in range(100000):
     print(itr,") Loss=", Loss.data.cpu().numpy())
 
     # 모델 정확도 확인 및 저장
-    if itr % 100 == 0:
+    if itr % 10 == 0:
         # 예측 결과
-        segs = torch.argmax(Pred, 1).cpu().detach().numpy()
+        segs = torch.argmax(Pred, 1).cpu().detach()
 
         # 정확도 계산
         acc, precision, recall, TPr, TNr, FPr, FNr = pr0287.seg_acc(segs, anns, batch_size)
         loss_val = round(Loss.data.numpy().item(),5)
+
+        miou = pr0287.seg_miou(batch_size, anns, segs, 2)
 
         print('itr: ', itr,
               ' Loss: ', Loss.item(),
@@ -160,21 +160,28 @@ for itr in range(100000):
               ' TPr: ', TPr,
               ' TNr: ', TNr,
               ' FPr: ', FPr,
-              ' FNr: ', FNr
-        )
+              ' FNr: ', FNr,
+              ' mIoU: ', miou)
 
         # 모델 정확도 저장
-        model_df = model_df.append({'itr': itr,
-                                    'loss_val': loss_val,
-                                    'acc': acc,
-                                    'precision': precision,
-                                    'recall': recall,
-                                    'TPr': TPr,
-                                    'TNr': TNr,
-                                    'FPr': FPr,
-                                    'FNr': FNr},
-                                   ignore_index=True)
-        model_df.to_excel(output_dir + '00_model_acc.xlsx', index=False)
+        if itr == 0:
+            model_all_df = pd.DataFrame(columns=['itr', 'loss_val', 'acc', 'precision', 'recall',
+                                                 'TPr', 'TNr', 'FPr', 'FNr','miou'])
+        model_df = pd.DataFrame(index=range(1), columns=['itr', 'loss_val', 'acc', 'precision', 'recall',
+                                                         'TPr', 'TNr', 'FPr', 'FNr','miou'])
+        model_df.loc[0, 'itr'] = itr
+        model_df.loc[0, 'loss_val'] = loss_val
+        model_df.loc[0, 'acc'] = acc
+        model_df.loc[0, 'precision'] = precision
+        model_df.loc[0, 'recall'] = recall
+        model_df.loc[0, 'TPr'] = TPr
+        model_df.loc[0, 'TNr'] = TNr
+        model_df.loc[0, 'FPr'] = FPr
+        model_df.loc[0, 'FNr'] = FNr
+        model_df.loc[0, 'miou'] = miou
+
+        mode_all_df = pd.concat([model_all_df, model_df], axis=0)
+        model_all_df.to_excel(output_dir + '00_model_acc.xlsx', index=False)
 
         # 모델 저장
         torch.save(Net.state_dict(), output_dir + 'crack_model_' + str(itr) + '.pth')

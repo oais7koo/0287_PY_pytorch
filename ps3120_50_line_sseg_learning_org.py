@@ -139,10 +139,10 @@ for itr in range(10000): # Training loop
     Loss=criterion(Pred,ann.long()) # Calculate cross entropy loss
     # Pred 차원 : [2, 3, 900, 900] (batchSize, class, height, width)
     # ann 차원 : [2, 900, 900] (batchSize, height, width)
-    
+
     Loss.backward() # Backpropogate loss
     optimizer.step() # Apply gradient descent change to weight
-    seg = torch.argmax(Pred[0], 0).cpu().detach().numpy()  # Get  prediction classes
+    seg = torch.argmax(Pred[0], 0).cpu().detach()  # Get  prediction classes
     print(itr,") Loss=",Loss.data.cpu().numpy())
 
 

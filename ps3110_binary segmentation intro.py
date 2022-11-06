@@ -36,7 +36,7 @@ start = time.time()
 # Parameter
 # ################################################################################
 prefix = 'ps3110'
-workname = 'binary segmentation intro'
+workname = 'binary segmentation intro using pytorch lighting'
 print(prefix + '_' + workname)
 
 # ################################################################################

@@ -3,6 +3,7 @@
 # ################################################################################
 import numpy as np
 import torch
+from torchmetrics import JaccardIndex
 
 # ################################################################################
 # 2차원 배열에 원하는 값이 몇개 있는지 확인
@@ -22,6 +23,7 @@ def count_val_in_tensor(t1, val):
 # Seg acc 계산
 # ################################################################################
 def seg_acc(segs, anns, batch_size):
+    # segs와 anns는 둘다 tensor이다.
 
     TP_all = 0
     TN_all = 0
@@ -55,10 +57,27 @@ def seg_acc(segs, anns, batch_size):
     TPr = round(TP_all / (TP_all + TN_all + FP_all + FN_all), 4)
     TNr = round(TN_all / (TP_all + TN_all + FP_all + FN_all), 4)
     FPr = round(FP_all / (TP_all + TN_all + FP_all + FN_all), 4)
-    FNr = round(FN_all / (TP_all + TN_all + FP_all + FN_all), 4)        
-    
+    FNr = round(FN_all / (TP_all + TN_all + FP_all + FN_all), 4)
+
 
     return acc, precision, recall, TPr, TNr, FPr, FNr
+
+# ################################################################################
+# Seg mIou 계산
+# ################################################################################
+def seg_miou(batch_size, anns, segs, class_cnt):
+
+    iou_list = []
+
+    for i in range(batch_size):
+        seg = segs[i]
+        ann = anns[i]
+        jaccard = JaccardIndex(num_classes=class_cnt)
+        rlt = jaccard(ann, seg)
+        iou_list.append(rlt.item())
+
+    miou = round(np.mean(iou_list), 4)
+    return miou
 
 # ################################################################################
 if __name__ == '__main__':

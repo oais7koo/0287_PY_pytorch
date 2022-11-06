@@ -24,6 +24,7 @@ from PIL import Image
 
 import cv2
 import torchvision.models.segmentation
+import pr0287
 
 start = time.time()
 
@@ -31,7 +32,7 @@ start = time.time()
 # Setting
 # ################################################################################
 prefix = 'ps3125'
-workname = '50줄로 sseg 완성'
+workname = '50줄 2분류 물병 sseg 학습'
 print(prefix + '_' + workname)
 
 output_dir = 'psdata/' + prefix + '/'
@@ -42,8 +43,8 @@ if not os.path.exists(output_dir):
 # Parameter
 # ################################################################################
 Learning_Rate = 1e-5
-width = height = 900  # image width and height
-batchSize = 6
+width = height = 800  # image width and height
+batchSize = 10
 
 # ################################################################################
 # IO
@@ -75,9 +76,9 @@ def ReadRandomImage():  # First lets load random image and  the corresponding an
     idx = np.random.randint(0, len(ListImages))  # Select random image
     Img = cv2.imread(os.path.join(TrainFolder, "Image", ListImages[idx]))[
         :, :, 0:3]
-    Filled = cv2.imread(os.path.join(TrainFolder,
-                                     "Semantic/16_Filled",
-                                     ListImages[idx].replace("jpg", "png")), 0)
+    #Filled = cv2.imread(os.path.join(TrainFolder,
+    #                                 "Semantic/16_Filled",
+    #                                 ListImages[idx].replace("jpg", "png")), 0)
     Vessel = cv2.imread(os.path.join(TrainFolder,
                                      "Semantic/1_Vessel",
                                      ListImages[idx].replace("jpg", "png")), 0)
@@ -85,8 +86,8 @@ def ReadRandomImage():  # First lets load random image and  the corresponding an
     AnnMap = np.zeros(Img.shape[0:2], np.float32)
     if Vessel is not None:
         AnnMap[Vessel == 1] = 1
-    if Filled is not None:
-        AnnMap[Filled == 1] = 2
+    #if Filled is not None:
+    #    AnnMap[Filled == 1] = 2
     Img = transformImg(Img)
     AnnMap = transformAnn(AnnMap)
     return Img, AnnMap
@@ -104,12 +105,13 @@ def LoadBatch():  # Load batch of images
 # ################################################################################
 # Load and set net and optimizer
 # ################################################################################
-# device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
+#device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 device = torch.device('cpu')
+print(device)
 
 Net = torchvision.models.segmentation.deeplabv3_resnet50(
     pretrained=True)  # Load net
-Net.classifier[4] = torch.nn.Conv2d(256, 3,
+Net.classifier[4] = torch.nn.Conv2d(256, 2,
                                     kernel_size=(1, 1),
                                     stride=(1, 1))  # Change final layer to 3 classes
 Net = Net.to(device)
@@ -120,15 +122,18 @@ optimizer = torch.optim.Adam(params=Net.parameters(), lr=Learning_Rate)
 # ################################################################################
 # Train
 # ################################################################################
+
 for itr in range(10000):  # Training loop
     images, ann = LoadBatch()  # Load taining batch
     # images 사이즈 : torch.Size([3, 3, 900, 900])
     # 배치로 3을 했기 때문에 3개의 이미지가 들어가 있음
 
-    images = torch.autograd.Variable(
-        images, requires_grad=False).to(device)  # Load image
-    ann = torch.autograd.Variable(
-        ann, requires_grad=False).to(device)  # Load annotation
+    images = torch.autograd.Variable(images, requires_grad=False).to(device)
+    # Load image
+
+    ann = torch.autograd.Variable(ann, requires_grad=False).to(device)
+    # Load annotation
+
     Pred = Net(images)['out']  # make prediction
     # Pred 사이즈 : torch.Size([3, 3, 900, 900])
     # 배치로 3을 했기 때문에 3개의 이미지가 들어가 있음
@@ -139,17 +144,54 @@ for itr in range(10000):  # Training loop
     Loss.backward()  # Backpropogate loss
     optimizer.step()  # Apply gradient descent change to weight
 
-    # 예측 결과 얻기
-    seg = torch.argmax(Pred[0], 0).cpu().detach().numpy()
+    print(itr,") Loss=", Loss.data.cpu().numpy())
 
-    # accuracy 계산
-    acc = (torch.tensor(seg) == ann[0]).sum().float() / (height * width)
-    # 배치로 예측된 결과에 대해서 예측결과 Pred에서 첫번째 것을 가져옴
+    # 모델 정확도 확인 및 저장
+    if itr % 10 == 0:
+        # 예측 결과
+        segs = torch.argmax(Pred, 1).cpu().detach()
 
-    print(itr, ") Loss=", Loss.data.cpu().numpy(), 'Acc : ', round(acc.item(),3))
-    if itr % 100 == 0:  # Save model weight once every 60k steps permenant file
-        print("Saving Model" + str(itr) + ".torch")
-        torch.save(Net.state_dict(),   str(itr) + ".torch")
+        # 정확도 계산
+        acc, precision, recall, TPr, TNr, FPr, FNr = pr0287.seg_acc(segs, ann, batchSize)
+        loss_val = round(Loss.data.numpy().item(),5)
+
+        miou = pr0287.seg_miou(batchSize, ann, segs, 2)
+
+        print('itr: ', itr,
+              ' Loss: ', Loss.item(),
+              ' Model Acc: ', acc,
+              ' Precision: ', precision,
+              ' Recall: ', recall,
+              ' TPr: ', TPr,
+              ' TNr: ', TNr,
+              ' FPr: ', FPr,
+              ' FNr: ', FNr,
+              ' mIoU: ', miou)
+
+        # 모델 정확도 저장
+        if itr == 0:
+            model_all_df = pd.DataFrame(columns=['itr', 'loss_val', 'acc', 'precision', 'recall',
+                                                 'TPr', 'TNr', 'FPr', 'FNr','miou'])
+        model_df = pd.DataFrame(index= range(1), columns=['itr','loss_val','acc','precision','recall',
+                                                          'TPr', 'TNr', 'FPr', 'FNr', 'miou'])
+        model_df.loc[0,'itr'] = itr
+        model_df.loc[0,'loss_val'] = loss_val
+        model_df.loc[0,'acc'] = acc
+        model_df.loc[0,'precision'] = precision
+        model_df.loc[0,'recall'] = recall
+        model_df.loc[0,'TPr'] = TPr
+        model_df.loc[0,'TNr'] = TNr
+        model_df.loc[0,'FPr'] = FPr
+        model_df.loc[0,'FNr'] = FNr
+        model_df.loc[0, 'miou'] = miou
+
+
+        mode_all_df = pd.concat([model_all_df, model_df], axis=0)
+        model_all_df.to_excel(output_dir + '00_model_acc.xlsx', index=False)
+
+        # 모델 저장
+        torch.save(Net.state_dict(), output_dir + 'model_' + str(itr) + '.pth')
+
 
 # ################################################################################
 # Finish
