@@ -31,8 +31,8 @@ start = time.time()
 # ################################################################################
 # Setting
 # ################################################################################
-prefix = 'ps3125'
-workname = '50줄 2분류 물병 sseg 학습'
+prefix = 'ps3126'
+workname = '50줄 2분류 물병 sseg 학습 표준화 제외'
 print(prefix + '_' + workname)
 
 output_dir = 'psdata/' + prefix + '/'
@@ -44,7 +44,7 @@ if not os.path.exists(output_dir):
 # ################################################################################
 Learning_Rate = 1e-5
 width = height = 800  # image width and height
-batchSize = 10
+batchSize = 3
 
 # ################################################################################
 # IO
@@ -60,7 +60,7 @@ transformImg = tf.Compose([
     tf.ToPILImage(),
     tf.Resize((height, width)),
     tf.ToTensor(),
-    tf.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
+    #tf.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
 ])
 
 transformAnn = tf.Compose([tf.ToPILImage(),
@@ -72,11 +72,13 @@ transformAnn = tf.Compose([tf.ToPILImage(),
 # ################################################################################
 # Read image
 # ################################################################################
+
+
 def ReadRandomImage():  # First lets load random image and  the corresponding annotation
     idx = np.random.randint(0, len(ListImages))  # Select random image
     Img = cv2.imread(os.path.join(TrainFolder, "Image", ListImages[idx]))[
         :, :, 0:3]
-    #Filled = cv2.imread(os.path.join(TrainFolder,
+    # Filled = cv2.imread(os.path.join(TrainFolder,
     #                                 "Semantic/16_Filled",
     #                                 ListImages[idx].replace("jpg", "png")), 0)
     Vessel = cv2.imread(os.path.join(TrainFolder,
@@ -86,7 +88,7 @@ def ReadRandomImage():  # First lets load random image and  the corresponding an
     AnnMap = np.zeros(Img.shape[0:2], np.float32)
     if Vessel is not None:
         AnnMap[Vessel == 1] = 1
-    #if Filled is not None:
+    # if Filled is not None:
     #    AnnMap[Filled == 1] = 2
     Img = transformImg(Img)
     AnnMap = transformAnn(AnnMap)
@@ -144,7 +146,7 @@ for itr in range(10000):  # Training loop
     Loss.backward()  # Backpropogate loss
     optimizer.step()  # Apply gradient descent change to weight
 
-    print(itr,") Loss=", Loss.data.cpu().numpy())
+    print(itr, ") Loss=", Loss.data.cpu().numpy())
 
     # 모델 정확도 확인 및 저장
     if itr % 10 == 0:
@@ -152,8 +154,9 @@ for itr in range(10000):  # Training loop
         segs = torch.argmax(Pred, 1).cpu().detach()
 
         # 정확도 계산
-        acc, precision, recall, TPr, TNr, FPr, FNr = pr0287.seg_acc(segs, ann, batchSize)
-        loss_val = round(Loss.data.numpy().item(),5)
+        acc, precision, recall, TPr, TNr, FPr, FNr = pr0287.seg_acc(
+            segs, ann, batchSize)
+        loss_val = round(Loss.data.numpy().item(), 5)
 
         miou = pr0287.seg_miou(batchSize, ann, segs, 2)
 
@@ -171,20 +174,19 @@ for itr in range(10000):  # Training loop
         # 모델 정확도 저장
         if itr == 0:
             model_all_df = pd.DataFrame(columns=['itr', 'loss_val', 'acc', 'precision', 'recall',
-                                                 'TPr', 'TNr', 'FPr', 'FNr','miou'])
-        model_df = pd.DataFrame(index= range(1), columns=['itr','loss_val','acc','precision','recall',
-                                                          'TPr', 'TNr', 'FPr', 'FNr', 'miou'])
-        model_df.loc[0,'itr'] = itr
-        model_df.loc[0,'loss_val'] = loss_val
-        model_df.loc[0,'acc'] = acc
-        model_df.loc[0,'precision'] = precision
-        model_df.loc[0,'recall'] = recall
-        model_df.loc[0,'TPr'] = TPr
-        model_df.loc[0,'TNr'] = TNr
-        model_df.loc[0,'FPr'] = FPr
-        model_df.loc[0,'FNr'] = FNr
+                                                 'TPr', 'TNr', 'FPr', 'FNr', 'miou'])
+        model_df = pd.DataFrame(index=range(1), columns=['itr', 'loss_val', 'acc', 'precision', 'recall',
+                                                         'TPr', 'TNr', 'FPr', 'FNr', 'miou'])
+        model_df.loc[0, 'itr'] = itr
+        model_df.loc[0, 'loss_val'] = loss_val
+        model_df.loc[0, 'acc'] = acc
+        model_df.loc[0, 'precision'] = precision
+        model_df.loc[0, 'recall'] = recall
+        model_df.loc[0, 'TPr'] = TPr
+        model_df.loc[0, 'TNr'] = TNr
+        model_df.loc[0, 'FPr'] = FPr
+        model_df.loc[0, 'FNr'] = FNr
         model_df.loc[0, 'miou'] = miou
-
 
         model_all_df = pd.concat([model_all_df, model_df], axis=0)
         model_all_df.to_excel(output_dir + '00_model_acc.xlsx', index=False)

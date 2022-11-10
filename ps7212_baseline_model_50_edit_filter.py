@@ -27,8 +27,8 @@ start = time.time()
 # ################################################################################
 # Setting
 # ################################################################################
-prefix = 'ps7210'
-workname = '50_line crack baseline model'
+prefix = 'ps7212'
+workname = '50_line crack baseline model 필터 수정'
 print(prefix + '_' + workname)
 
 # output setting
@@ -41,19 +41,16 @@ if not os.path.exists(output_dir):
 # ################################################################################
 learning_rate=1e-5
 width=height=512 # image width and height
-batch_size = 10
+batch_size=10
 
 in_channels = 256
 out_channels = 2
 
-k_size = 3 # kernel size
-p_size = 0 # padding size
-
 # ################################################################################
 # IO
 # ################################################################################
-train_img_filepath = 'psdata/ps7120/train/img'
-train_mask_filepath = 'psdata/ps7120/train/mask/'
+train_img_filepath = 'psdata/ps7130/train/img'
+train_mask_filepath = 'psdata/ps7130/train/mask/'
 
 train_img_list=os.listdir(train_img_filepath)
 train_mask_list=pr0287.mask_list_load(train_img_list, train_mask_filepath)
@@ -64,7 +61,7 @@ train_mask_list=pr0287.mask_list_load(train_img_list, train_mask_filepath)
 img_transform = transforms.Compose([
     #transforms.ToPILImage(),
     transforms.ToTensor(),
-    transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
+    #transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
     # 전학습된 모델을 사용해서인걸로
     ])
 
@@ -99,7 +96,6 @@ imgset, maskset = read_images(train_img_list, train_mask_list, height, width)
 def load_batch(batch_size, imgset, maskset):
     cnt = len(imgset)
     idxs = np.random.choice(cnt, batch_size)
-    #print(idxs)
     return imgset[idxs], maskset[idxs]
 
 # ################################################################################
@@ -109,11 +105,8 @@ def load_batch(batch_size, imgset, maskset):
 device = torch.device('cpu')
 
 Net = torchvision.models.segmentation.deeplabv3_resnet50(pretrained=True)
-Net.classifier[4] = torch.nn.Conv2d(in_channels,
-                                    out_channels,
-                                    kernel_size=k_size,
-                                    stride=(1, 1),
-                                    padding = p_size)
+Net.classifier[4] = torch.nn.Conv2d(in_channels, out_channels, kernel_size=(3,3),
+                                    stride=(1, 1), padding=1)
 ## out_channels의 의미는 필터임
 
 Net = Net.to(device)
@@ -152,7 +145,7 @@ for itr in range(100000):
         segs = segs.type(torch.IntTensor)
         anns = anns.type(torch.IntTensor)
         acc, precision, recall, TPr, TNr, FPr, FNr = pr0287.seg_acc(segs, anns, batch_size)
-        loss_val = round(Loss.data.numpy().item(), 5)
+        loss_val = round(Loss.data.numpy().item(),5)
 
         miou = pr0287.seg_miou(batch_size, anns, segs, 2)
 

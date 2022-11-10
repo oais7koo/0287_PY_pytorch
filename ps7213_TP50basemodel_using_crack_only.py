@@ -20,15 +20,15 @@ import torchvision.transforms as transforms
 import matplotlib.pyplot as plt
 import numpy as np
 from PIL import Image
-
+import pr0287
 
 start = time.time()
 
 # ################################################################################
 # Setting
 # ################################################################################
-prefix = 'ps7211'
-workname = '50_line crack baseline model 모델 수정 zero_grad'
+prefix = 'ps7213'
+workname = '50_line crack baseline 에 크랙데이터만 사용'
 print(prefix + '_' + workname)
 
 # output setting
@@ -41,7 +41,7 @@ if not os.path.exists(output_dir):
 # ################################################################################
 learning_rate=1e-5
 width=height=512 # image width and height
-batch_size=5
+batch_size=10
 
 in_channels = 256
 out_channels = 2
@@ -49,17 +49,11 @@ out_channels = 2
 # ################################################################################
 # IO
 # ################################################################################
-train_img_filepath = 'psdata/ps7120/train/img'
-train_mask_filepath = 'psdata/ps7120/train/mask'
-
-test_img_filepath = 'psdata/ps7120/test/img'
-test_mask_filepath = 'psdata/ps7120/test/mask'
+train_img_filepath = 'psdata/ps7130/train/img'
+train_mask_filepath = 'psdata/ps7130/train/mask'
 
 train_img_list=os.listdir(train_img_filepath)
 train_mask_list=os.listdir(train_mask_filepath)
-
-test_img_list = os.listdir(test_img_filepath)
-test_mask_list = os.listdir(test_mask_filepath)
 
 # ################################################################################
 # transform
@@ -91,6 +85,10 @@ def read_images(img_list, mask_list,height, width):
         mask_t = mask_transform(mask)
         imgset[i] = img_t
         maskset[i] = mask_t
+
+    maskset = torch.where(maskset == 0, maskset, torch.tensor(1))
+    #maskset = maskset.type(torch.IntTensor)
+    #imgset = imgset.type(torch.IntTensor)
     return imgset, maskset
 
 imgset, maskset = read_images(train_img_list, train_mask_list, height, width)
@@ -110,7 +108,8 @@ def load_batch(batch_size, imgset, maskset):
 device = torch.device('cpu')
 
 Net = torchvision.models.segmentation.deeplabv3_resnet50(pretrained=True)
-Net.classifier[4] = torch.nn.Conv2d(in_channels, out_channels, kernel_size=(1, 1), stride=(1, 1))
+Net.classifier[4] = torch.nn.Conv2d(in_channels, out_channels, kernel_size=(3,3),
+                                    stride=(1, 1), padding=1)
 ## out_channels의 의미는 필터임
 
 Net = Net.to(device)
@@ -119,49 +118,11 @@ Net = Net.to(device)
 optimizer = torch.optim.Adam(params=Net.parameters(), lr=learning_rate)
 
 # ################################################################################
-# Model Acc 계산
-# ################################################################################
-def cal_acc(segs, anns,batch_size):
-
-    TP_all = 0
-    TN_all = 0
-    FP_all = 0
-    FN_all = 0
-
-    for i in range(batch_size):
-
-        seg = segs[i]
-        ann = anns[i]
-
-        TP_px = torch.sum((seg == ann)*(ann == 1)).item()
-        TN_px = torch.sum((seg == ann)*(ann == 0)).item()
-        FP_px = torch.sum((seg != ann)*(ann == 0)).item()
-        FN_px = torch.sum((seg != ann)*(ann == 1)).item()
-
-        TP_all += TP_px
-        TN_all += TN_px
-        FP_all += FP_px
-        FN_all += FN_px
-
-    # 전체 픽셀에서 맞춘 픽셀 수
-    acc = round((TP_all + TN_all) / (TP_all + TN_all + FP_all + FN_all),5)
-
-    # 검출된 것의 정확도
-    precision = round(TP_all / (TP_all + FP_all + 1),5)
-
-    # 전체 크랙에서 몇퍼센트를 맞추었는지
-    recall = round(TP_all / (TP_all + FN_all + 1),5)
-
-    return acc, precision, recall
-
-
-# ################################################################################
 # Train
 # ################################################################################
 # 모델 정확도 저장할 df 작성
-model_df = pd.DataFrame(columns=['itr','loss_val','acc','precision','recall'])
 
-for itr in range(1000):
+for itr in range(100000):
     imgs, anns = load_batch(batch_size, imgset, maskset)
 
     imgs = torch.autograd.Variable(imgs, requires_grad=False).to(device)
@@ -170,32 +131,57 @@ for itr in range(1000):
     Pred = Net(imgs)['out']
     # torch.Size([5, 2, 512, 512]) 배치 5에 클래스 2
 
-    #Net.zero_grad()
+    Net.zero_grad()
     criterion = torch.nn.CrossEntropyLoss()
     Loss = criterion(Pred, anns.long())
     Loss.backward()
     optimizer.step()
-    optimizer.zero_grad()
 
-    print(itr,") Loss=",Loss.data.cpu().numpy())
+    print(itr,") Loss=", Loss.data.cpu().numpy())
+
     # 모델 정확도 확인 및 저장
     if itr % 100 == 0:
         # 예측 결과
-        segs = torch.argmax(Pred, 1).cpu().detach().numpy()
+        segs = torch.argmax(Pred, 1).cpu().detach()
 
         # 정확도 계산
-        acc, precision, recall = cal_acc(segs, anns, batch_size)
-
+        segs = segs.type(torch.IntTensor)
+        anns = anns.type(torch.IntTensor)
+        acc, precision, recall, TPr, TNr, FPr, FNr = pr0287.seg_acc(segs, anns, batch_size)
         loss_val = round(Loss.data.numpy().item(),5)
 
-        print('itr: ', itr, ' Loss: ', Loss.item(),
-            ' Model Acc: ', acc, ' Precision: ', precision, ' Recall: ', recall)
+        miou = pr0287.seg_miou(batch_size, anns, segs, 2)
+
+        print('itr: ', itr,
+              ' Loss: ', Loss.item(),
+              ' Model Acc: ', acc,
+              ' Precision: ', precision,
+              ' Recall: ', recall,
+              ' TPr: ', TPr,
+              ' TNr: ', TNr,
+              ' FPr: ', FPr,
+              ' FNr: ', FNr,
+              ' mIoU: ', miou)
 
         # 모델 정확도 저장
-        model_df = model_df.append({'itr': itr, 'loss_val': loss_val, 'acc': acc,
-                                    'precision': precision, 'recall': recall},
-                                   ignore_index=True)
-        model_df.to_excel(output_dir + '00_model_acc.xlsx', index=False)
+        if itr == 0:
+            model_all_df = pd.DataFrame(columns=['itr', 'loss_val', 'acc', 'precision', 'recall',
+                                                 'TPr', 'TNr', 'FPr', 'FNr','miou'])
+        model_df = pd.DataFrame(index=range(1), columns=['itr', 'loss_val', 'acc', 'precision', 'recall',
+                                                         'TPr', 'TNr', 'FPr', 'FNr','miou'])
+        model_df.loc[0, 'itr'] = itr
+        model_df.loc[0, 'loss_val'] = loss_val
+        model_df.loc[0, 'acc'] = acc
+        model_df.loc[0, 'precision'] = precision
+        model_df.loc[0, 'recall'] = recall
+        model_df.loc[0, 'TPr'] = TPr
+        model_df.loc[0, 'TNr'] = TNr
+        model_df.loc[0, 'FPr'] = FPr
+        model_df.loc[0, 'FNr'] = FNr
+        model_df.loc[0, 'miou'] = miou
+
+        model_all_df = pd.concat([model_all_df, model_df], axis=0)
+        model_all_df.to_excel(output_dir + '00_model_acc.xlsx', index=False)
 
         # 모델 저장
         torch.save(Net.state_dict(), output_dir + 'crack_model_' + str(itr) + '.pth')

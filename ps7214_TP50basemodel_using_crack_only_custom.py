@@ -21,14 +21,15 @@ import matplotlib.pyplot as plt
 import numpy as np
 from PIL import Image
 import pr0287
+import cv2
 
 start = time.time()
 
 # ################################################################################
 # Setting
 # ################################################################################
-prefix = 'ps7210'
-workname = '50_line crack baseline model'
+prefix = 'ps7214'
+workname = '50_line crack baseline 에 크랙데이터만 사용'
 print(prefix + '_' + workname)
 
 # output setting
@@ -41,35 +42,32 @@ if not os.path.exists(output_dir):
 # ################################################################################
 learning_rate=1e-5
 width=height=512 # image width and height
-batch_size = 10
+batch_size=5
 
 in_channels = 256
 out_channels = 2
 
-k_size = 3 # kernel size
-p_size = 0 # padding size
-
 # ################################################################################
 # IO
 # ################################################################################
-train_img_filepath = 'psdata/ps7120/train/img'
-train_mask_filepath = 'psdata/ps7120/train/mask/'
+train_img_filepath = 'psdata/ps7130/train/img'
+train_mask_filepath = 'psdata/ps7130/train/mask/'
 
 train_img_list=os.listdir(train_img_filepath)
-train_mask_list=pr0287.mask_list_load(train_img_list, train_mask_filepath)
+train_mask_list = pr0287.mask_list_load(train_img_list, train_mask_filepath)
 
 # ################################################################################
 # transform
 # ################################################################################
 img_transform = transforms.Compose([
-    #transforms.ToPILImage(),
+    transforms.ToPILImage(),
     transforms.ToTensor(),
     transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
     # 전학습된 모델을 사용해서인걸로
     ])
 
 mask_transform = transforms.Compose([
-    #transforms.ToPILImage(),
+    transforms.ToPILImage(), # 원본에서는 매스크 파일이 배열이라서 넣어 둔 것임
     transforms.ToTensor()
     ])
 
@@ -82,13 +80,18 @@ def read_images(img_list, mask_list,height, width):
     maskset = torch.zeros(img_cnt, height, width)
 
     for i in range(len(img_list)):
-        img = Image.open(os.path.join(train_img_filepath, img_list[i]))
-        mask = Image.open(mask_list[i])
+        img = cv2.imread(os.path.join(train_img_filepath, img_list[i]))
+        mask = cv2.imread(mask_list[i])[:,:,0]
+        # 채널 1개
+
         img_t = img_transform(img)
         mask_t = mask_transform(mask)
+        #print(torch.unique(mask_t))
         imgset[i] = img_t
         maskset[i] = mask_t
+
     maskset = torch.where(maskset == 0, maskset, torch.tensor(1))
+    print(torch.unique(maskset))
     return imgset, maskset
 
 imgset, maskset = read_images(train_img_list, train_mask_list, height, width)
@@ -99,7 +102,6 @@ imgset, maskset = read_images(train_img_list, train_mask_list, height, width)
 def load_batch(batch_size, imgset, maskset):
     cnt = len(imgset)
     idxs = np.random.choice(cnt, batch_size)
-    #print(idxs)
     return imgset[idxs], maskset[idxs]
 
 # ################################################################################
@@ -109,11 +111,8 @@ def load_batch(batch_size, imgset, maskset):
 device = torch.device('cpu')
 
 Net = torchvision.models.segmentation.deeplabv3_resnet50(pretrained=True)
-Net.classifier[4] = torch.nn.Conv2d(in_channels,
-                                    out_channels,
-                                    kernel_size=k_size,
-                                    stride=(1, 1),
-                                    padding = p_size)
+Net.classifier[4] = torch.nn.Conv2d(in_channels, out_channels, kernel_size=(3,3),
+                                    stride=(1, 1), padding=1)
 ## out_channels의 의미는 필터임
 
 Net = Net.to(device)
@@ -136,7 +135,9 @@ for itr in range(100000):
     # torch.Size([5, 2, 512, 512]) 배치 5에 클래스 2
 
     Net.zero_grad()
-    criterion = torch.nn.CrossEntropyLoss()
+    weight_loss = torch.FloatTensor([0.001, 0.999]).to(device)
+    criterion = torch.nn.CrossEntropyLoss(weight=weight_loss)
+    #criterion = torch.nn.CrossEntropyLoss()
     Loss = criterion(Pred, anns.long())
     Loss.backward()
     optimizer.step()
@@ -152,7 +153,7 @@ for itr in range(100000):
         segs = segs.type(torch.IntTensor)
         anns = anns.type(torch.IntTensor)
         acc, precision, recall, TPr, TNr, FPr, FNr = pr0287.seg_acc(segs, anns, batch_size)
-        loss_val = round(Loss.data.numpy().item(), 5)
+        loss_val = round(Loss.data.numpy().item(),5)
 
         miou = pr0287.seg_miou(batch_size, anns, segs, 2)
 

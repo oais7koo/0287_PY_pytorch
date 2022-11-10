@@ -42,10 +42,10 @@ if not os.path.exists(output_dir):
 # ################################################################################
 # IO
 # ################################################################################
-modelPath = "psdata/ps3125/3000.torch"  # Path to trained model
-imagePath = "test.jpg"  # Test image
+modelPath = "psdata/ps3125/model_140.pth"  # Path to trained model
+# Test image
+imagePath = "psdata/ps1020_LabPicsV1/Simple/Test/Image/Koen2All_Chemistry experiment 2. - Coloured flask.-screenshot (1).jpg"
 height=width=900
-
 
 # ################################################################################
 # Process

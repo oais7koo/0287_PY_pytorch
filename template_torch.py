@@ -9,15 +9,15 @@ import os
 import shutil
 import time
 import pandas as pd
-from glob import glob
+import glob 
 from os.path import basename
 import pickle
+import tqdm
 
 import torch
 import torchvision
 import torchvision.transforms as transforms
 import matplotlib.pyplot as plt
-import matplotlib.image as image
 import numpy as np
 from PIL import Image
 
@@ -25,19 +25,20 @@ from PIL import Image
 start = time.time()
 
 # ################################################################################
-# Parameter
+# Setting
 # ################################################################################
 prefix = 'ps'
 workname = ''
 print(prefix + '_' + workname)
 
-# ################################################################################
-# IO
-# ################################################################################
 # output setting
 output_dir = 'psdata/' + prefix + '/'
 if not os.path.exists(output_dir):
     os.makedirs(output_dir)
+
+# ################################################################################
+# IO
+# ################################################################################
     
 
 # ################################################################################

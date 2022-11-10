@@ -65,7 +65,7 @@ transformImg=tf.Compose([
 ])
 
 transformAnn=tf.Compose([tf.ToPILImage(),
-                         tf.Resize((height,width), tf.InterpolationMode.NEAREST),
+                         tf.Resize((height,width),tf.InterpolationMode.NEAREST),
                          tf.ToTensor()
 ])
 

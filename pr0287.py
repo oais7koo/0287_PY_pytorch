@@ -4,6 +4,7 @@
 import numpy as np
 import torch
 from torchmetrics import JaccardIndex
+from os.path import basename
 
 # ################################################################################
 # 2차원 배열에 원하는 값이 몇개 있는지 확인
@@ -78,6 +79,21 @@ def seg_miou(batch_size, anns, segs, class_cnt):
 
     miou = round(np.mean(iou_list), 4)
     return miou
+
+# ################################################################################
+# maskfile list 불러오기
+# ################################################################################
+
+def mask_list_load(img_list, mask_dir):
+    mask_list = []
+
+    for img_nm in img_list:
+        img_filename = basename(img_nm)
+        mask_filepath = mask_dir + img_filename
+        mask_list.append(mask_filepath)
+
+    return mask_list
+
 
 # ################################################################################
 if __name__ == '__main__':
