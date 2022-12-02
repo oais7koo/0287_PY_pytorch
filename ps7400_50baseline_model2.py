@@ -42,16 +42,16 @@ if not os.path.exists(output_dir):
 # Parameter
 # ################################################################################
 # 선택사항
-pc_nm = 'ai'
+pc_nm = 'oaisdesk'
 dataset_type = 'dilation' # base - 기본데이터(전체), crack - 크랩만, dilation - 픽셀1개 확장
 batch_size = 50
 k_size = 3  # kernel size 1 or 3
 normalize_yn = 'y' # y or n
-device_val = 'gpu'
+device_val = 'cpu'
 acc_interval = 100
 
 weight_yn = 'y'
-weight_val = [0.001, 0.999]
+weight_val = [0.0001, 0.9999]
 
 para_msg = 'dataset_type::' + dataset_type + '_k_size::' + str(k_size) + '_normal::' + \
     normalize_yn + '_weight::' + weight_yn + '_' + str(weight_val)
@@ -197,8 +197,7 @@ else:
     device = torch.device('cpu')
 
 #if model_v == deeplabv3_resnet50:
-Net = torchvision.models.segmentation.deeplabv3_resnet50(pretrained=True)
-
+Net = torchvision.models.segmentation.deeplabv3_resnet50(weights='DeepLabV3_ResNet50_Weights.DEFAULT')
 
 Net.classifier[4] = torch.nn.Conv2d(in_channels,
                                     out_channels,
